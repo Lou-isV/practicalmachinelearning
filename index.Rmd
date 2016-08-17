@@ -1,0 +1,85 @@
+---
+title: "Practical Machine Learning Writeup"
+output: 
+  html_document: 
+    theme: cosmo
+---
+
+> Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+> Reading and Cleaning
+
+I removed the first seven columns as they were more informative and not relevant in predicting the *classe* variable. I then removed columns that had all NAs.
+
+```{r message=FALSE, warning=FALSE}
+train_ <- read.csv("pml-training.csv", header=TRUE, na.strings=c("NA","#DIV/0!"))
+test <- read.csv("pml-testing.csv", header=TRUE, na.strings=c("NA", "#DIV/0!"))
+train_ <- train_[,-(1:7)]
+test <- test[,-(1:7)]
+train_ <- train_[colSums(is.na(train_)) == 0]
+test <- test[colSums(is.na(test)) == 0]
+```
+
+Creating a new testing and training set from the *pml-training* file using p=0.6.
+
+```{r message=FALSE, warning=FALSE}
+library(caret)
+library(randomForest)
+set.seed(801)
+
+inTrain <- createDataPartition(y=train_$classe, p=0.6, list=FALSE)
+training <- train_[inTrain,]
+testing <- train_[-inTrain,]
+dim(training)
+dim(testing)
+```
+
+> Modeling
+
+**Random Forest**
+
+First I used the `randomForest` function in R to build my model it performed very good. As you can see below, the model used 500 trees with 7 variables at each split and had an out of bag-error-rate of 0.75%.
+```{r message=FALSE, warning=FALSE}
+set.seed(801)
+
+rfMod <- randomForest(classe ~., data=training)
+rfMod
+rfPred <- predict(rfMod, testing)
+confusionMatrix(rfPred, testing$classe)
+```
+The accuracy when predicting on the *testing* file is very good with an accuracy of 0.9938 with an error rate of 0.0062
+
+**Stochastic Gradient Boosting**
+
+Now I check the accuracy using the `gbm` method with 4 fold repeated 2 times.
+```{r message=FALSE, warning=FALSE}
+library(gbm)
+library(doParallel)
+library(knitr)
+set.seed(801)
+
+fitControl <- trainControl(method = "repeatedcv", number=4, repeats = 2,selectionFunction = "best", allowParallel = TRUE)
+gbmMod <- train(classe ~ ., data = training, method = "gbm", trControl = fitControl, maximize=TRUE, verbose = FALSE)
+gbmPred <- predict(gbmMod,testing)
+confusionMatrix(gbmPred, testing$classe)
+```
+This method has a high accuracy of 0.9613 and error rate of 0.0387 but it is not as accurate as the random forest method.
+
+> Predicting the 20 Cases
+
+Because of higher accuracy, I will use the random forest method to predict the 20 cases.
+
+```{r message=FALSE, warning=FALSE, kable}
+answersRF <- data.frame(predict(rfMod,test))
+kable(answersRF)
+```
+
+
+
+
+
+
+
+
